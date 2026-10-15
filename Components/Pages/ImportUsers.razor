@@ -1,0 +1,160 @@
+@page "/import"
+@using System.Text
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Data.Sqlite
+@using UserManager.Web.Models
+@inject IUserService UserService
+@inject ILogger<ImportUsers> Logger
+
+<PageTitle>Import users | User Manager</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">USER DIRECTORY</div>
+        <h1>Import users</h1>
+        <p class="page-intro">Add users from a CSV file.</p>
+    </div>
+    <a class="button button-secondary" href="/">Back to users</a>
+</section>
+
+<section class="panel import-panel" aria-busy="@(IsBusy ? "true" : "false")">
+    <div class="import-intro">
+        <div class="import-icon" aria-hidden="true">CSV</div>
+        <div>
+            <h2>Choose a CSV file</h2>
+            <p>Use a header row with <code>FirstName</code>, <code>LastName</code>, <code>Email</code>, and <code>IsActive</code>. The status value must be <code>true</code> or <code>false</code>.</p>
+        </div>
+    </div>
+
+    <div class="file-field">
+        <label for="csv-file">CSV file</label>
+        <InputFile id="csv-file" accept=".csv,text/csv" OnChange="SelectFileAsync" disabled="@IsBusy" />
+        <span class="field-hint">Maximum file size: 2 MB.</span>
+        @if (!string.IsNullOrWhiteSpace(_fileName))
+        {
+            <span class="selected-file">Selected: @_fileName</span>
+        }
+    </div>
+
+    <div class="form-actions import-actions">
+        <button class="button button-primary"
+                type="button"
+                disabled="@(IsBusy || string.IsNullOrWhiteSpace(_csvContent))"
+                @onclick="ImportAsync">
+            @(_isImporting ? "Importing..." : "Import selected file")
+        </button>
+        <a class="text-link" href="/sample-users.csv" download>Download a sample CSV</a>
+    </div>
+
+    @if (IsBusy)
+    {
+        <p class="operation-status" role="status">@(_isImporting ? "Importing users..." : "Reading file...")</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="notice notice-error" role="alert">@_errorMessage</div>
+    }
+
+    @if (_result is not null)
+    {
+        <div class="notice @(_result.Errors.Count == 0 ? "notice-success" : "notice-warning")" role="status">
+            <strong>Import complete.</strong>
+            Imported @_result.ImportedCount @(_result.ImportedCount == 1 ? "user" : "users").
+            @if (_result.Errors.Count > 0)
+            {
+                <span>@_result.Errors.Count @(_result.Errors.Count == 1 ? "row was" : "rows were") not imported.</span>
+                <ul class="import-errors">
+                    @foreach (var error in _result.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    private const long MaxFileSize = 2 * 1024 * 1024;
+
+    private string? _csvContent;
+    private string? _fileName;
+    private string? _errorMessage;
+    private CsvImportResult? _result;
+    private bool _isReadingFile;
+    private bool _isImporting;
+    private bool IsBusy => _isReadingFile || _isImporting;
+
+    private async Task SelectFileAsync(InputFileChangeEventArgs eventArgs)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        _isReadingFile = true;
+        _errorMessage = null;
+        _result = null;
+        _csvContent = null;
+        _fileName = null;
+
+        try
+        {
+            await using var stream = eventArgs.File.OpenReadStream(MaxFileSize);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            _csvContent = await reader.ReadToEndAsync();
+            _fileName = eventArgs.File.Name;
+        }
+        catch (IOException exception)
+        {
+            Logger.LogWarning(exception, "Could not read the selected CSV file.");
+            _errorMessage = "The selected file could not be read. Choose a CSV file no larger than 2 MB.";
+        }
+        finally
+        {
+            _isReadingFile = false;
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_csvContent))
+        {
+            _errorMessage = "Choose a CSV file before importing.";
+            return;
+        }
+
+        _isImporting = true;
+        _errorMessage = null;
+        _result = null;
+
+        try
+        {
+            _result = await UserService.ImportCsvAsync(_csvContent);
+        }
+        catch (FormatException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (DbUpdateException exception)
+        {
+            Logger.LogError(exception, "Could not import users from CSV.");
+            _errorMessage = "We couldn't import this file right now. Please try again.";
+        }
+        catch (SqliteException exception)
+        {
+            Logger.LogError(exception, "Could not read user data while importing CSV.");
+            _errorMessage = "We couldn't import this file right now. Please try again.";
+        }
+        finally
+        {
+            _isImporting = false;
+        }
+    }
+}

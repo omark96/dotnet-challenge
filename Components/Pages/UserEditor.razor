@@ -1,0 +1,204 @@
+@page "/users/new"
+@page "/users/{Id:int}/edit"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Data.Sqlite
+@using System.ComponentModel.DataAnnotations
+@using UserManager.Web.Models
+@inject IUserService UserService
+@inject NavigationManager Navigation
+@inject ILogger<UserEditor> Logger
+
+<PageTitle>@(Id.HasValue ? "Edit user" : "Add user") | User Manager</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="notice notice-error" role="alert">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p class="operation-status" role="status">Loading user...</p>
+}
+else if (_loadFailed)
+{
+    <a class="button button-secondary" href="/">Back to users</a>
+}
+else if (_isMissing)
+{
+    <section class="panel form-panel">
+        <div class="eyebrow">USER NOT FOUND</div>
+        <h1>This user is unavailable</h1>
+        <p class="page-intro">The user may have been removed or the address may be incorrect.</p>
+        <a class="button button-primary" href="/">Back to users</a>
+    </section>
+}
+else
+{
+    <section class="page-heading">
+        <div>
+            <div class="eyebrow">USER DIRECTORY</div>
+            <h1>@(Id.HasValue ? "Edit user" : "Add user")</h1>
+            <p class="page-intro">Enter the user's contact details and account status.</p>
+        </div>
+    </section>
+
+    <section class="panel form-panel" aria-busy="@(_isSaving ? "true" : "false")">
+        <EditForm Model="_model" OnValidSubmit="SaveAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="validation-summary" />
+
+            <fieldset class="form-fields" disabled="@_isSaving">
+                <legend class="visually-hidden">User details</legend>
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="first-name">First name</label>
+                        <InputText id="first-name" class="text-input" @bind-Value="_model.FirstName" autocomplete="given-name" />
+                        <ValidationMessage For="() => _model.FirstName" />
+                    </div>
+                    <div class="form-field">
+                        <label for="last-name">Last name</label>
+                        <InputText id="last-name" class="text-input" @bind-Value="_model.LastName" autocomplete="family-name" />
+                        <ValidationMessage For="() => _model.LastName" />
+                    </div>
+                    <div class="form-field form-field-wide">
+                        <label for="email">Email address</label>
+                        <InputText id="email" class="text-input" type="email" @bind-Value="_model.Email" autocomplete="email" />
+                        <ValidationMessage For="() => _model.Email" />
+                    </div>
+                    <div class="form-field form-field-wide">
+                        <label class="checkbox-label" for="is-active">
+                            <InputCheckbox id="is-active" class="checkbox-input" @bind-Value="_model.IsActive" />
+                            <span>
+                                <strong>Active account</strong>
+                                <span class="secondary-text">This user can access the organization's internal tools.</span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </fieldset>
+
+            <div class="form-actions">
+                <button class="button button-primary" type="submit" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save user")</button>
+                <a class="button button-secondary" href="/">Cancel</a>
+            </div>
+            @if (_isSaving)
+            {
+                <p class="operation-status" role="status">Saving user...</p>
+            }
+        </EditForm>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public int? Id { get; set; }
+
+    private UserFormModel _model = new();
+    private bool _isMissing;
+    private bool _isLoading = true;
+    private bool _loadFailed;
+    private bool _isSaving;
+    private int _loadVersion;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var version = ++_loadVersion;
+        _isLoading = true;
+        _loadFailed = false;
+        _errorMessage = null;
+        _isMissing = false;
+
+        try
+        {
+            if (Id is int id)
+            {
+                var user = await UserService.GetByIdAsync(id);
+                if (version != _loadVersion)
+                {
+                    return;
+                }
+
+                if (user is null)
+                {
+                    _isMissing = true;
+                    return;
+                }
+
+                _model = new UserFormModel
+                {
+                    FirstName = user.FirstName,
+                    LastName = user.LastName,
+                    Email = user.Email,
+                    IsActive = user.IsActive
+                };
+                return;
+            }
+
+            _model = new UserFormModel();
+        }
+        catch (SqliteException exception)
+        {
+            Logger.LogError(exception, "Could not load user {UserId}.", Id);
+            if (version == _loadVersion)
+            {
+                _loadFailed = true;
+                _errorMessage = "We couldn't load this user right now. Please return to the directory and try again.";
+            }
+        }
+        finally
+        {
+            if (version == _loadVersion)
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_isSaving || _isLoading || _isMissing || _loadFailed)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (Id is int id)
+            {
+                await UserService.UpdateAsync(id, _model);
+                Navigation.NavigateTo("/?saved=updated");
+            }
+            else
+            {
+                await UserService.CreateAsync(_model);
+                Navigation.NavigateTo("/?saved=created");
+            }
+        }
+        catch (ValidationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (DbUpdateException exception)
+        {
+            Logger.LogError(exception, "Could not save user details.");
+            _errorMessage = "We couldn't save this user right now. Please try again.";
+        }
+        catch (SqliteException exception)
+        {
+            Logger.LogError(exception, "Could not read user details while saving.");
+            _errorMessage = "We couldn't save this user right now. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

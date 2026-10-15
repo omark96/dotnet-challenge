@@ -1,0 +1,37 @@
+﻿@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="site-header">
+        <a class="brand" href="/" aria-label="User Manager home">
+            <span class="brand-mark" aria-hidden="true">UM</span>
+            <span class="brand-name">User Manager</span>
+        </a>
+        <div class="workspace-label">
+            <span class="workspace-indicator" aria-hidden="true"></span>
+            Internal workspace
+        </div>
+    </header>
+
+    <div class="workspace">
+        <aside class="sidebar">
+            <div class="sidebar-heading">Workspace</div>
+            <NavMenu />
+            <div class="sidebar-note">
+                <span class="sidebar-note-label">DIRECTORY</span>
+                <p>Keep your team information up to date.</p>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-container">
+                @Body
+            </div>
+            <footer class="site-footer">User Manager <span>·</span> Internal administration</footer>
+        </main>
+    </div>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unexpected error occurred.
+    <a href="." class="reload">Reload the page</a>
+</div>

@@ -1,0 +1,227 @@
+﻿@page "/"
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Data.Sqlite
+@using UserManager.Web.Models
+@inject IUserService UserService
+@inject ILogger<Home> Logger
+
+<PageTitle>Users | User Manager</PageTitle>
+
+<section class="page-heading">
+    <div>
+        <div class="eyebrow">DIRECTORY</div>
+        <h1>Users</h1>
+        <p class="page-intro">Manage user details and account status.</p>
+    </div>
+    <div class="heading-actions">
+        <a class="button button-secondary" href="/import">Import CSV</a>
+        <a class="button button-primary" href="/users/new">Add user</a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(_successMessage))
+{
+    <div class="notice notice-success" role="status">@_successMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="notice notice-error" role="alert">@_errorMessage</div>
+}
+
+<section class="panel directory-panel" aria-label="User directory" aria-busy="@(_isLoading || _isChangingStatus ? "true" : "false")">
+    <div class="panel-toolbar">
+        <div class="search-field">
+            <label for="user-search">Search users</label>
+            <input id="user-search"
+                   type="search"
+                   value="@_searchTerm"
+                   @oninput="SearchUsersAsync"
+                   disabled="@_isChangingStatus"
+                   placeholder="Search by first or last name"
+                   autocomplete="off" />
+        </div>
+        <div class="result-count" aria-live="polite">
+            <strong>@_users.Count</strong>
+            <span>@(_users.Count == 1 ? "user" : "users")</span>
+        </div>
+    </div>
+
+    @if (_isLoading || _isChangingStatus)
+    {
+        <p class="operation-status" role="status">@(_isChangingStatus ? "Updating status..." : "Loading users...")</p>
+    }
+
+    <div class="table-scroll">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Dates</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var user in _users)
+                {
+                    <tr @key="user.Id">
+                        <td>
+                            <div class="user-name">@user.FirstName @user.LastName</div>
+                            <div class="secondary-text">User #@user.Id</div>
+                        </td>
+                        <td><a class="email-link" href="mailto:@user.Email">@user.Email</a></td>
+                        <td>
+                            <span class="status-badge @(user.IsActive ? "status-active" : "status-inactive")">
+                                <span class="status-dot" aria-hidden="true"></span>
+                                @(user.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>
+                            <div class="date-primary">Created @user.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                            <div class="secondary-text">Updated @user.LastModifiedAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                        </td>
+                        <td class="actions-cell">
+                            <a class="table-action" href="@($"/users/{user.Id}/edit")">Edit</a>
+                            @if (user.IsActive)
+                            {
+                                <button class="table-action table-action-muted"
+                                        type="button"
+                                        disabled="@(_isLoading || _isChangingStatus)"
+                                        @onclick="() => SetStatusAsync(user, false)">
+                                    Deactivate
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="table-action table-action-muted"
+                                        type="button"
+                                        disabled="@(_isLoading || _isChangingStatus)"
+                                        @onclick="() => SetStatusAsync(user, true)">
+                                    Activate
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (!_isLoading && _errorMessage is null && _users.Count == 0)
+    {
+        <div class="empty-state">
+            <h2>@(string.IsNullOrWhiteSpace(_searchTerm) ? "No users found" : "No matching users")</h2>
+            <p>@(string.IsNullOrWhiteSpace(_searchTerm)
+                ? "Add a user to get started."
+                : "Try a different first or last name.")</p>
+        </div>
+    }
+</section>
+
+@code {
+    [SupplyParameterFromQuery(Name = "saved")]
+    public string? Saved { get; set; }
+
+    private IReadOnlyList<User> _users = [];
+    private string _searchTerm = string.Empty;
+    private string? _successMessage;
+    private string? _errorMessage;
+    private int _loadVersion;
+    private bool _isLoading = true;
+    private bool _isChangingStatus;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _successMessage = Saved switch
+        {
+            "created" => "User created successfully.",
+            "updated" => "User details saved successfully.",
+            _ => null
+        };
+
+        await LoadUsersAsync();
+    }
+
+    private async Task SearchUsersAsync(ChangeEventArgs eventArgs)
+    {
+        _searchTerm = eventArgs.Value?.ToString() ?? string.Empty;
+        _successMessage = null;
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        var version = ++_loadVersion;
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var users = await UserService.GetUsersAsync(_searchTerm);
+            if (version == _loadVersion)
+            {
+                _users = users;
+            }
+        }
+        catch (SqliteException exception)
+        {
+            Logger.LogError(exception, "Could not load the user directory.");
+            if (version == _loadVersion)
+            {
+                _errorMessage = "We couldn't load the users right now. Please try searching again.";
+            }
+        }
+        finally
+        {
+            if (version == _loadVersion)
+            {
+                _isLoading = false;
+            }
+        }
+    }
+
+    private async Task SetStatusAsync(User user, bool isActive)
+    {
+        if (_isLoading || _isChangingStatus)
+        {
+            return;
+        }
+
+        _isChangingStatus = true;
+        _successMessage = null;
+        _errorMessage = null;
+
+        try
+        {
+            await UserService.SetActiveAsync(user.Id, isActive);
+            if (isActive)
+            {
+                await LoadUsersAsync();
+                if (_errorMessage is null)
+                {
+                    _successMessage = $"{user.FirstName} {user.LastName} is now active.";
+                }
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            _errorMessage = exception.Message;
+        }
+        catch (DbUpdateException exception)
+        {
+            Logger.LogError(exception, "Could not update status for user {UserId}.", user.Id);
+            _errorMessage = "We couldn't update this user's status. Please try again.";
+        }
+        catch (SqliteException exception)
+        {
+            Logger.LogError(exception, "Could not read user {UserId} while updating status.", user.Id);
+            _errorMessage = "We couldn't update this user's status. Please try again.";
+        }
+        finally
+        {
+            _isChangingStatus = false;
+        }
+    }
+}
