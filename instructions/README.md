@@ -20,22 +20,35 @@ Refer to [SPECIFICATION.md](SPECIFICATION.md) for expected application behavior.
 - AI tools are welcome, but you must understand and be able to explain your solutions.
 - Working software, sound reasoning, and clear communication matter more than completing every task.
 
-## Run and test
+## Getting started
 
-Install the .NET 10 SDK, then clone the repository:
+1. Fork this repository to your own GitHub account.
+2. Clone your fork and work locally.
+3. Install the .NET 10 SDK if you do not already have it.
+4. Run the application and explore its functionality.
 
+From the repository root:
 ```powershell
-git clone https://github.com/Tenstar-AB/dotnet-challenge.git
-cd dotnet-challenge
 dotnet run
 ```
 
 Open the local URL printed by the application. The first run creates a local SQLite database with sample users.
 
-Run the public tests from the repository root:
+Run the public tests:
 
 ```powershell
 dotnet test .\UserManager.sln
 ```
 
 All challenge instructions and response templates are in `instructions\`. Run application and test commands from the repository root, not from that folder.
+
+## Submission
+
+1. Commit and push your changes to your fork.
+2. Complete CUSTOMER_RESPONSE.md and HANDOFF.md in the instructions/ directory.
+3. Submit the URL to your fork, including the branch name if you did not work on main.
+4. Keep your fork publicly accessible until the recruitment process has ended.
+
+Do not open a pull request against the original Tenstar repository.
+We may ask you to walk us through parts of your solution during a follow-up conversation. We are interested in your reasoning and what you learned, not just the final code.
+We do not evaluate the number of commits.
