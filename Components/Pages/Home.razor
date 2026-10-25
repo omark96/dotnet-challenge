@@ -1,9 +1,11 @@
 ﻿@page "/"
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.Data.Sqlite
+@using Microsoft.JSInterop
 @using UserManager.Web.Models
 @inject IUserService UserService
 @inject ILogger<Home> Logger
+@inject IJSRuntime JS
 
 <PageTitle>Users | User Manager</PageTitle>
 
@@ -189,6 +191,12 @@
             return;
         }
 
+        var confirmationText = isActive ? "Are you sure you want to activate this user?" : "Are you sure you want to deactivate this user?";
+        if (!await JS.InvokeAsync<bool>("confirm", confirmationText))
+        {
+            return; 
+        }
+
         _isChangingStatus = true;
         _successMessage = null;
         _errorMessage = null;
@@ -223,5 +231,8 @@
         {
             _isChangingStatus = false;
         }
+
+        await LoadUsersAsync();
+
     }
 }
