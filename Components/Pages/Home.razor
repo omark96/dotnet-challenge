@@ -43,6 +43,16 @@
                    placeholder="Search by first or last name"
                    autocomplete="off" />
         </div>
+        <div class="status-field">
+            <label for="status-filter">Status</label>
+            <select id="status-filter" 
+                    @bind="_userStatusFilter" 
+                    @bind:after="LoadUsersAsync">
+                <option value="@UserStatusFilter.All">All</option>
+                <option value="@UserStatusFilter.Active">Active</option>
+                <option value="@UserStatusFilter.Inactive">Inactive</option>
+            </select>
+        </div>
         <div class="result-count" aria-live="polite">
             <strong>@_users.Count</strong>
             <span>@(_users.Count == 1 ? "user" : "users")</span>
@@ -133,6 +143,7 @@
     private int _loadVersion;
     private bool _isLoading = true;
     private bool _isChangingStatus;
+    private UserStatusFilter _userStatusFilter = UserStatusFilter.All;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -161,7 +172,7 @@
 
         try
         {
-            var users = await UserService.GetUsersAsync(_searchTerm);
+            var users = await UserService.GetUsersAsync(_searchTerm, _userStatusFilter);
             if (version == _loadVersion)
             {
                 _users = users;

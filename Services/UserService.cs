@@ -10,7 +10,7 @@ public sealed class UserService(IDbContextFactory<UserManagerDbContext> contextF
 {
     private static readonly string[] RequiredHeaders = ["FirstName", "LastName", "Email", "IsActive"];
 
-    public async Task<IReadOnlyList<User>> GetUsersAsync(string? searchTerm = null)
+    public async Task<IReadOnlyList<User>> GetUsersAsync(string? searchTerm = null, UserStatusFilter statusFilter = UserStatusFilter.All)
     {
         await using var db = await contextFactory.CreateDbContextAsync();
         IQueryable<User> query = db.Users.AsNoTracking();
@@ -21,6 +21,14 @@ public sealed class UserService(IDbContextFactory<UserManagerDbContext> contextF
             query = query.Where(user =>
                 user.FirstName.ToLower().Contains(term) ||
                 user.LastName.ToLower().Contains(term));
+
+
+        }
+
+        if (statusFilter is not UserStatusFilter.All)
+        {
+            var active = statusFilter == UserStatusFilter.Active ? true : false;
+            query = query.Where(user => user.IsActive == active);
         }
 
         var users = await query

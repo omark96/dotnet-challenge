@@ -128,6 +128,45 @@ public sealed class UserServiceTests
             users.Select(user => user.LastName));
     }
 
+    [Theory]
+    [InlineData(null, UserStatusFilter.All, new[] { "Andersson", "Lind", "Rivera" })]
+    [InlineData(null, UserStatusFilter.Active, new[] { "Andersson" })]
+    [InlineData(null, UserStatusFilter.Inactive, new[] { "Lind", "Rivera" })]
+    [InlineData("ann", UserStatusFilter.All, new[] { "Andersson", "Lind" })]
+    [InlineData("ann", UserStatusFilter.Active, new[] { "Andersson" })]
+    [InlineData("ann", UserStatusFilter.Inactive, new[] { "Lind" })]
+    public async Task GetUsersAsync_FiltersByStatusAndSearch(
+    string? term, UserStatusFilter statusFilter, string[] expectedLastNames)
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new UserService(database);
+        await service.CreateAsync(new UserFormModel
+        {
+            FirstName = "Ann",
+            LastName = "Andersson",
+            Email = "ann.andersson@example.com",
+            IsActive = true
+        });
+        await service.CreateAsync(new UserFormModel
+        {
+            FirstName = "Anna",
+            LastName = "Lind",
+            Email = "anna.lind@example.com",
+            IsActive = false
+        });
+        await service.CreateAsync(new UserFormModel
+        {
+            FirstName = "Sam",
+            LastName = "Rivera",
+            Email = "sam.rivera@example.com",
+            IsActive = false
+        });
+
+        var users = await service.GetUsersAsync(term, statusFilter);
+
+        Assert.Equal(expectedLastNames, users.Select(user => user.LastName));
+    }
+
     [Fact]
     public async Task GetByIdAsync_MissingUserReturnsNull()
     {

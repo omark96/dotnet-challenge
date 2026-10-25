@@ -347,6 +347,7 @@ h2 {
 
 .search-field label,
 .form-field > label,
+.status-field > label,
 .file-field > label {
     margin-bottom: 6px;
     display: block;
@@ -356,6 +357,7 @@ h2 {
 }
 
 .search-field input,
+.status-field select,
 .text-input {
     width: 100%;
     min-height: 41px;

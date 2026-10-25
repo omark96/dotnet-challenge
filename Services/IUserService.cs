@@ -4,7 +4,7 @@ namespace UserManager.Web.Services;
 
 public interface IUserService
 {
-    Task<IReadOnlyList<User>> GetUsersAsync(string? searchTerm = null);
+    Task<IReadOnlyList<User>> GetUsersAsync(string? searchTerm = null, UserStatusFilter statusFilter = UserStatusFilter.All);
 
     Task<User?> GetByIdAsync(int id);
 
