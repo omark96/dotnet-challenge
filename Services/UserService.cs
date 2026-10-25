@@ -23,10 +23,13 @@ public sealed class UserService(IDbContextFactory<UserManagerDbContext> contextF
                 user.LastName.ToLower().Contains(term));
         }
 
-        return await query
-            .OrderBy(user => user.LastName)
-            .ThenBy(user => user.FirstName)
+        var users = await query
             .ToListAsync();
+
+        return users
+            .OrderBy(user => user.LastName, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(user => user.FirstName, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
     }
 
     public async Task<User?> GetByIdAsync(int id)

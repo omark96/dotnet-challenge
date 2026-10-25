@@ -111,6 +111,24 @@ public sealed class UserServiceTests
     }
 
     [Fact]
+    public async Task GetUsersAsync_SortsBySwedishAlphabet()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var service = new UserService(database);
+
+        foreach (var lastName in new[] { "Öberg", "Zetterberg", "Åberg", "Ahlström", "Ängström" })
+        {
+            await service.CreateAsync(UserWithLastName(lastName));
+        }
+
+        var users = await service.GetUsersAsync(null);
+
+        Assert.Equal(
+            new[] { "Ahlström", "Zetterberg", "Åberg", "Ängström", "Öberg" },
+            users.Select(user => user.LastName));
+    }
+
+    [Fact]
     public async Task GetByIdAsync_MissingUserReturnsNull()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -374,6 +392,13 @@ public sealed class UserServiceTests
         FirstName = "Ada",
         LastName = "Lovelace",
         Email = "ada.lovelace@example.com"
+    };
+
+    private static UserFormModel UserWithLastName(string lastName) => new()
+    {
+        FirstName = "Test",
+        LastName = lastName,
+        Email = $"{Guid.NewGuid():N}@example.com"
     };
 
     private static string Quote(string value) => $"\"{value.Replace("\"", "\"\"")}\"";
