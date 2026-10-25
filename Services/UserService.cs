@@ -17,10 +17,10 @@ public sealed class UserService(IDbContextFactory<UserManagerDbContext> contextF
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
-            var term = searchTerm.Trim();
+            var term = searchTerm.Trim().ToLower();
             query = query.Where(user =>
-                user.FirstName.Contains(term) ||
-                user.LastName.Contains(term));
+                user.FirstName.ToLower().Contains(term) ||
+                user.LastName.ToLower().Contains(term));
         }
 
         return await query

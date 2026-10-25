@@ -68,6 +68,7 @@ public sealed class UserServiceTests
     [InlineData("Lovelace")]
     [InlineData("  Ada  ")]
     [InlineData("\tLovelace ")]
+    [InlineData("ada")]
     public async Task GetUsersAsync_FindsNameMatchesAndTrimsSearch(string term)
     {
         await using var database = await TestDatabase.CreateAsync();
